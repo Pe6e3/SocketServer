@@ -4,10 +4,10 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <RootNamespace>SocketServer</RootNamespace>
-    <AssemblyName>SocketServer</AssemblyName>
+    <RootNamespace>SocketConsoleClient</RootNamespace>
+    <AssemblyName>socket-console</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Remove="SocketConsoleClient/**" />
+    <PackageReference Include="Terminal.Gui" Version="1.17.1" />
   </ItemGroup>
 </Project>

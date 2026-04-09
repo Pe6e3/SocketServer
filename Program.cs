@@ -1,22 +1,72 @@
 using System.Net.Sockets;
+using SocketServer;
 
 var port = int.TryParse(Environment.GetEnvironmentVariable("PORT"), out var p) ? p : 1984;
-// Слушаем все сетевые интерфейсы (IPv4 и IPv6), чтобы принимать TCP извне, не только с localhost.
-var listener = TcpListener.Create(port);
-listener.Start();
+var logPort = int.TryParse(Environment.GetEnvironmentVariable("LOG_PORT"), out var lp) ? lp : port + 1;
+var loggerHttpPort = int.TryParse(Environment.GetEnvironmentVariable("LOGGER_HTTP_PORT"), out var hp) ? hp : 5080;
 
-Console.Error.WriteLine($"TCP *:{port} — все интерфейсы (IPv4/IPv6), входящие байты → stdout");
-
-while (true)
+using var shutdown = new CancellationTokenSource();
+Console.CancelKeyPress += (_, e) =>
 {
-    var client = await listener.AcceptTcpClientAsync();
-    _ = HandleClientAsync(client);
+    e.Cancel = true;
+    shutdown.Cancel();
+};
+
+var dataListener = TcpListener.Create(port);
+var logListener = TcpListener.Create(logPort);
+dataListener.Start();
+logListener.Start();
+var loggerHttpTask = SocketLoggerHttpServer.RunAsync(loggerHttpPort, logPort, shutdown.Token);
+
+await ServerLogging.BroadcastAsync($"TCP *:{port} — приём данных (stdout процесса); логи *:{logPort} (подписчики); HTTP UI 127.0.0.1:{loggerHttpPort}", shutdown.Token).ConfigureAwait(false);
+
+var logAcceptTask = LogHub.AcceptLogClientsAsync(logListener, shutdown.Token);
+
+try
+{
+    while (!shutdown.IsCancellationRequested)
+    {
+        TcpClient client;
+        try
+        {
+            client = await dataListener.AcceptTcpClientAsync(shutdown.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            break;
+        }
+
+        _ = HandleDataClientAsync(client, shutdown.Token);
+    }
+}
+finally
+{
+    dataListener.Stop();
+    logListener.Stop();
 }
 
-static async Task HandleClientAsync(TcpClient client)
+try
+{
+    await logAcceptTask.ConfigureAwait(false);
+}
+catch (OperationCanceledException)
+{
+    // завершение
+}
+
+try
+{
+    await loggerHttpTask.ConfigureAwait(false);
+}
+catch (OperationCanceledException)
+{
+    // завершение
+}
+
+static async Task HandleDataClientAsync(TcpClient client, CancellationToken cancellationToken)
 {
     var remote = client.Client.RemoteEndPoint?.ToString() ?? "?";
-    await Console.Error.WriteLineAsync($"[connect] {remote}");
+    await ServerLogging.BroadcastAsync($"[connect] {remote}", cancellationToken).ConfigureAwait(false);
 
     try
     {
@@ -24,12 +74,23 @@ static async Task HandleClientAsync(TcpClient client)
         var stdout = Console.OpenStandardOutput();
         var buffer = new byte[8192];
         int n;
-        while ((n = await stream.ReadAsync(buffer)) > 0)
-            await stdout.WriteAsync(buffer.AsMemory(0, n));
+        while (!cancellationToken.IsCancellationRequested &&
+               (n = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken).ConfigureAwait(false)) > 0)
+        {
+            await stdout.WriteAsync(buffer.AsMemory(0, n), cancellationToken).ConfigureAwait(false);
+            await stdout.FlushAsync(cancellationToken).ConfigureAwait(false);
+            var preview = DataPreview.Format(buffer.AsMemory(0, n));
+            await ServerLogging.BroadcastAsync($"[rx] {remote} {n} B {preview}", cancellationToken).ConfigureAwait(false);
+        }
     }
     catch (IOException ex)
     {
-        await Console.Error.WriteLineAsync($"[socket error] {remote}: {ex.Message}");
+        await ServerLogging.BroadcastAsync($"[socket error] {remote}: {ex.Message}", CancellationToken.None)
+            .ConfigureAwait(false);
+    }
+    catch (OperationCanceledException)
+    {
+        // shutdown
     }
     catch (ObjectDisposedException)
     {
@@ -38,6 +99,6 @@ static async Task HandleClientAsync(TcpClient client)
     finally
     {
         client.Dispose();
-        await Console.Error.WriteLineAsync($"[disconnect] {remote}");
+        await ServerLogging.BroadcastAsync($"[disconnect] {remote}", CancellationToken.None).ConfigureAwait(false);
     }
 }

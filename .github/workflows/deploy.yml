@@ -24,7 +24,39 @@ jobs:
             git checkout main
             git pull --ff-only origin main
 
-            dotnet publish -c Release -o /home/pe6e3/SocketServer/publish
+            dotnet publish -c Release -o /home/pe6e3/SocketServer/bin/Release/net8.0/publish
+            dotnet publish SocketConsoleClient/SocketConsoleClient.csproj -c Release -o /home/pe6e3/SocketServer/publish-client
 
             sudo systemctl restart socketserver.service
             sudo systemctl status socketserver.service --no-pager
+
+            sudo cp -f /home/pe6e3/SocketServer/socket-console-client.service /etc/systemd/system/socket-console-client.service
+            sudo systemctl daemon-reload
+            sudo systemctl enable --now socket-console-client.service
+            sudo systemctl restart socket-console-client.service
+            sudo systemctl status socket-console-client.service --no-pager
+
+            sudo mkdir -p /etc/nginx/snippets
+            sudo tee /etc/nginx/snippets/socket-logger-location.conf >/dev/null <<'EOF'
+            location = /socket-logger {
+                return 301 /socket-logger/;
+            }
+
+            location /socket-logger/ {
+                proxy_http_version 1.1;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_read_timeout 3600;
+                proxy_buffering off;
+                proxy_pass http://127.0.0.1:5080/;
+            }
+            EOF
+
+            if ! sudo grep -q "socket-logger-location.conf" /etc/nginx/sites-available/default; then
+              sudo sed -i '/server_name _;/a \    include /etc/nginx/snippets/socket-logger-location.conf;' /etc/nginx/sites-available/default
+            fi
+
+            sudo nginx -t
+            sudo systemctl reload nginx
