@@ -204,9 +204,18 @@ internal static class LogPersistence
     {
         if (string.IsNullOrWhiteSpace(connectionString))
             return;
-        var store = new PostgresLogStore(connectionString);
-        await store.EnsureSchemaAsync(cancellationToken).ConfigureAwait(false);
-        _store = store;
+        try
+        {
+            var store = new PostgresLogStore(connectionString);
+            await store.EnsureSchemaAsync(cancellationToken).ConfigureAwait(false);
+            _store = store;
+        }
+        catch (Exception ex)
+        {
+            await Console.Error.WriteLineAsync($"[log-persistence-disabled] {ex.GetType().Name}: {ex.Message}")
+                .ConfigureAwait(false);
+            _store = null;
+        }
     }
 
     public static void TryEnqueue(DateTimeOffset createdAt, string message)

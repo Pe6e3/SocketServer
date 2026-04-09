@@ -9,6 +9,7 @@ Restart=always
 RestartSec=5
 SyslogIdentifier=SocketServer
 Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=POSTGRES_CONNECTION_STRING=Host=127.0.0.1;Port=5432;Database=socket_logs;Username=socket_logs_user;Password=change_me
 
 [Install]
 WantedBy=default.target
