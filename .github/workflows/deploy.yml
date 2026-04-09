@@ -27,56 +27,19 @@ jobs:
             dotnet publish SocketServer.csproj -c Release -o /home/pe6e3/SocketServer/bin/Release/net8.0/publish
             dotnet publish SocketConsoleClient/SocketConsoleClient.csproj -c Release -o /home/pe6e3/SocketServer/publish-client
 
-            run_sudo() {
-              if [ "$(id -u)" -eq 0 ]; then
-                "$@"
-                return
-              fi
-              if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
-                sudo -n "$@"
-                return
-              fi
-              echo "ERROR: Need root SSH_USER or passwordless sudo."
+            mkdir -p /home/pe6e3/.config/systemd/user
+            cp -f /home/pe6e3/SocketServer/deploy/systemd-user/socketserver.service /home/pe6e3/.config/systemd/user/socketserver.service
+            cp -f /home/pe6e3/SocketServer/deploy/systemd-user/socket-console-client.service /home/pe6e3/.config/systemd/user/socket-console-client.service
+
+            if ! systemctl --user daemon-reload; then
+              echo "ERROR: systemd --user is unavailable. Enable linger once: sudo loginctl enable-linger pe6e3"
               exit 1
-            }
-
-            if [ "$(id -u)" -ne 0 ]; then
-              if ! command -v sudo >/dev/null 2>&1; then
-                echo "ERROR: sudo is required for non-root deployment."
-                exit 1
-              fi
             fi
 
-            run_sudo systemctl restart socketserver.service
-            run_sudo systemctl status socketserver.service --no-pager
+            systemctl --user enable --now socketserver.service
+            systemctl --user restart socketserver.service
+            systemctl --user status socketserver.service --no-pager
 
-            run_sudo cp -f /home/pe6e3/SocketServer/socket-console-client.service /etc/systemd/system/socket-console-client.service
-            run_sudo systemctl daemon-reload
-            run_sudo systemctl enable --now socket-console-client.service
-            run_sudo systemctl restart socket-console-client.service
-            run_sudo systemctl status socket-console-client.service --no-pager
-
-            run_sudo mkdir -p /etc/nginx/snippets
-            run_sudo tee /etc/nginx/snippets/socket-logger-location.conf >/dev/null <<'EOF'
-            location = /socket-logger {
-                return 301 /socket-logger/;
-            }
-
-            location /socket-logger/ {
-                proxy_http_version 1.1;
-                proxy_set_header Host $host;
-                proxy_set_header X-Real-IP $remote_addr;
-                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                proxy_set_header X-Forwarded-Proto $scheme;
-                proxy_read_timeout 3600;
-                proxy_buffering off;
-                proxy_pass http://127.0.0.1:5080/;
-            }
-            EOF
-
-            if ! run_sudo grep -q "socket-logger-location.conf" /etc/nginx/sites-available/default; then
-              run_sudo sed -i '/server_name _;/a \    include /etc/nginx/snippets/socket-logger-location.conf;' /etc/nginx/sites-available/default
-            fi
-
-            run_sudo nginx -t
-            run_sudo systemctl reload nginx
+            systemctl --user enable --now socket-console-client.service
+            systemctl --user restart socket-console-client.service
+            systemctl --user status socket-console-client.service --no-pager

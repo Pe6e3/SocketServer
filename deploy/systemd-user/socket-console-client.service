@@ -1,0 +1,15 @@
+[Unit]
+Description=SocketConsoleClient (user service, log tailer)
+After=network.target socketserver.service
+Wants=socketserver.service
+
+[Service]
+WorkingDirectory=/home/pe6e3/SocketServer
+ExecStart=/bin/bash -lc 'if [ -f /home/pe6e3/SocketServer/publish-client/socket-console.dll ]; then exec /usr/bin/dotnet /home/pe6e3/SocketServer/publish-client/socket-console.dll 127.0.0.1 1984 1985 --plain; else exec /usr/bin/dotnet /home/pe6e3/SocketServer/SocketConsoleClient/bin/Release/net8.0/socket-console.dll 127.0.0.1 1984 1985 --plain; fi'
+Restart=always
+RestartSec=5
+SyslogIdentifier=SocketConsoleClient
+Environment=DOTNET_NOLOGO=1
+
+[Install]
+WantedBy=default.target

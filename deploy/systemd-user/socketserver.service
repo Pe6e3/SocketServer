@@ -1,0 +1,14 @@
+[Unit]
+Description=SocketServer (user service)
+After=network.target
+
+[Service]
+WorkingDirectory=/home/pe6e3/SocketServer/bin/Release/net8.0/publish
+ExecStart=/usr/bin/dotnet /home/pe6e3/SocketServer/bin/Release/net8.0/publish/SocketServer.dll
+Restart=always
+RestartSec=5
+SyslogIdentifier=SocketServer
+Environment=ASPNETCORE_ENVIRONMENT=Production
+
+[Install]
+WantedBy=default.target
