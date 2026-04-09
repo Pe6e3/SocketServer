@@ -24,20 +24,30 @@ jobs:
             git checkout main
             git pull --ff-only origin main
 
-            dotnet publish -c Release -o /home/pe6e3/SocketServer/bin/Release/net8.0/publish
+            dotnet publish SocketServer.csproj -c Release -o /home/pe6e3/SocketServer/bin/Release/net8.0/publish
             dotnet publish SocketConsoleClient/SocketConsoleClient.csproj -c Release -o /home/pe6e3/SocketServer/publish-client
 
-            sudo systemctl restart socketserver.service
-            sudo systemctl status socketserver.service --no-pager
+            SUDO=""
+            if [ "$(id -u)" -ne 0 ]; then
+              if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+                SUDO="sudo -n"
+              else
+                echo "ERROR: Нужен root SSH_USER или passwordless sudo для деплоя (systemctl/nginx/cp в /etc)."
+                exit 1
+              fi
+            fi
 
-            sudo cp -f /home/pe6e3/SocketServer/socket-console-client.service /etc/systemd/system/socket-console-client.service
-            sudo systemctl daemon-reload
-            sudo systemctl enable --now socket-console-client.service
-            sudo systemctl restart socket-console-client.service
-            sudo systemctl status socket-console-client.service --no-pager
+            $SUDO systemctl restart socketserver.service
+            $SUDO systemctl status socketserver.service --no-pager
 
-            sudo mkdir -p /etc/nginx/snippets
-            sudo tee /etc/nginx/snippets/socket-logger-location.conf >/dev/null <<'EOF'
+            $SUDO cp -f /home/pe6e3/SocketServer/socket-console-client.service /etc/systemd/system/socket-console-client.service
+            $SUDO systemctl daemon-reload
+            $SUDO systemctl enable --now socket-console-client.service
+            $SUDO systemctl restart socket-console-client.service
+            $SUDO systemctl status socket-console-client.service --no-pager
+
+            $SUDO mkdir -p /etc/nginx/snippets
+            $SUDO tee /etc/nginx/snippets/socket-logger-location.conf >/dev/null <<'EOF'
             location = /socket-logger {
                 return 301 /socket-logger/;
             }
@@ -54,9 +64,9 @@ jobs:
             }
             EOF
 
-            if ! sudo grep -q "socket-logger-location.conf" /etc/nginx/sites-available/default; then
-              sudo sed -i '/server_name _;/a \    include /etc/nginx/snippets/socket-logger-location.conf;' /etc/nginx/sites-available/default
+            if ! $SUDO grep -q "socket-logger-location.conf" /etc/nginx/sites-available/default; then
+              $SUDO sed -i '/server_name _;/a \    include /etc/nginx/snippets/socket-logger-location.conf;' /etc/nginx/sites-available/default
             fi
 
-            sudo nginx -t
-            sudo systemctl reload nginx
+            $SUDO nginx -t
+            $SUDO systemctl reload nginx
