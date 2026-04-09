@@ -6,3 +6,4 @@ obj/
 .env
 *.log
 publish-client/
+data/

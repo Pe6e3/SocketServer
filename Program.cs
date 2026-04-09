@@ -4,9 +4,18 @@ using SocketServer;
 var port = int.TryParse(Environment.GetEnvironmentVariable("PORT"), out var p) ? p : 1984;
 var logPort = int.TryParse(Environment.GetEnvironmentVariable("LOG_PORT"), out var lp) ? lp : port + 1;
 var loggerHttpPort = int.TryParse(Environment.GetEnvironmentVariable("LOGGER_HTTP_PORT"), out var hp) ? hp : 5080;
-var postgresConnectionString =
-    Environment.GetEnvironmentVariable("POSTGRES_CONNECTION_STRING") ??
-    Environment.GetEnvironmentVariable("LOGS_POSTGRES_CONNECTION_STRING");
+var sqlitePath =
+    Environment.GetEnvironmentVariable("LOG_SQLITE_PATH") ??
+    Environment.GetEnvironmentVariable("LOGS_SQLITE_PATH") ??
+    "/home/pe6e3/SocketServer/data/logs.db";
+var logRetentionDays =
+    int.TryParse(Environment.GetEnvironmentVariable("LOG_RETENTION_DAYS"), out var retentionDays) ? retentionDays : 50;
+var logSegmentMaxRows =
+    int.TryParse(Environment.GetEnvironmentVariable("LOG_SEGMENT_MAX_ROWS"), out var segmentMaxRows) ? segmentMaxRows : 500_000;
+var logMaxTotalRows =
+    long.TryParse(Environment.GetEnvironmentVariable("LOG_MAX_TOTAL_ROWS"), out var maxTotalRows) ? maxTotalRows : 5_000_000;
+var logMaxSamePerSecond =
+    int.TryParse(Environment.GetEnvironmentVariable("LOG_MAX_SAME_PER_SECOND"), out var maxSamePerSecond) ? maxSamePerSecond : 200;
 
 using var shutdown = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) =>
@@ -15,7 +24,14 @@ Console.CancelKeyPress += (_, e) =>
     shutdown.Cancel();
 };
 
-await LogPersistence.InitializeAsync(postgresConnectionString, shutdown.Token).ConfigureAwait(false);
+await LogPersistence.InitializeAsync(
+        sqlitePath,
+        logRetentionDays,
+        logSegmentMaxRows,
+        logMaxTotalRows,
+        logMaxSamePerSecond,
+        shutdown.Token)
+    .ConfigureAwait(false);
 
 var dataListener = TcpListener.Create(port);
 var logListener = TcpListener.Create(logPort);

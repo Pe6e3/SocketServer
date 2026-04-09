@@ -9,7 +9,11 @@ Restart=always
 RestartSec=5
 SyslogIdentifier=SocketServer
 Environment=ASPNETCORE_ENVIRONMENT=Production
-Environment=POSTGRES_CONNECTION_STRING=Host=127.0.0.1;Port=5432;Database=socket_logs;Username=socket_logs_user;Password=change_me
+Environment=LOG_SQLITE_PATH=/home/pe6e3/SocketServer/data/logs.db
+Environment=LOG_RETENTION_DAYS=50
+Environment=LOG_SEGMENT_MAX_ROWS=500000
+Environment=LOG_MAX_TOTAL_ROWS=5000000
+Environment=LOG_MAX_SAME_PER_SECOND=200
 
 [Install]
 WantedBy=default.target
