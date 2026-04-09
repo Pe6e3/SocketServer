@@ -55,6 +55,14 @@ internal static class SocketLoggerHttpServer
     let q = '';
     const max = 4000;
 
+    function decodeEscapes(text) {
+      return text
+        .replace(/\\r\\n/g, '\n')
+        .replace(/\\n/g, '\n')
+        .replace(/\\r/g, '\n')
+        .replace(/\\t/g, '\t');
+    }
+
     function render() {
       const frag = document.createDocumentFragment();
       let shown = 0;
@@ -63,7 +71,7 @@ internal static class SocketLoggerHttpServer
         if (q && !line.toLowerCase().includes(q)) continue;
         const div = document.createElement('div');
         div.className = 'line';
-        div.textContent = line;
+        div.textContent = decodeEscapes(line);
         frag.appendChild(div);
         shown++;
       }
@@ -78,12 +86,13 @@ internal static class SocketLoggerHttpServer
     const es = new EventSource('./logs');
     es.onopen = () => { status.textContent = 'online'; };
     es.onmessage = (evt) => {
-      lines.push(evt.data);
+      const decoded = decodeEscapes(evt.data);
+      lines.push(decoded);
       if (lines.length > max) lines.splice(0, lines.length - max + 200);
-      if (!q || evt.data.toLowerCase().includes(q)) {
+      if (!q || decoded.toLowerCase().includes(q)) {
         const div = document.createElement('div');
         div.className = 'line';
-        div.textContent = evt.data;
+        div.textContent = decoded;
         log.appendChild(div);
         log.scrollTop = log.scrollHeight;
       }

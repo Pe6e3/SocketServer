@@ -12,6 +12,23 @@ internal static class ServerLogging
     }
 }
 
+internal static class EndpointFormatter
+{
+    public static string Normalize(string endpoint)
+    {
+        if (string.IsNullOrWhiteSpace(endpoint))
+            return endpoint;
+        if (!endpoint.StartsWith("[::ffff:", StringComparison.OrdinalIgnoreCase))
+            return endpoint;
+        var endBracket = endpoint.IndexOf(']');
+        if (endBracket < 0)
+            return endpoint;
+        var ip = endpoint[8..endBracket];
+        var suffix = endpoint[(endBracket + 1)..];
+        return $"{ip}{suffix}";
+    }
+}
+
 internal static class DataPreview
 {
     public static string Format(ReadOnlyMemory<byte> mem, int maxLen = 96)

@@ -83,7 +83,8 @@ internal static class LogHub
 
     private static async Task HoldLogSubscriberAsync(TcpClient client, CancellationToken cancellationToken)
     {
-        var remote = client.Client.RemoteEndPoint?.ToString() ?? "?";
+        var remoteRaw = client.Client.RemoteEndPoint?.ToString() ?? "?";
+        var remote = EndpointFormatter.Normalize(remoteRaw);
         Stream? stream = null;
         try
         {

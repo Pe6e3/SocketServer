@@ -65,7 +65,8 @@ catch (OperationCanceledException)
 
 static async Task HandleDataClientAsync(TcpClient client, CancellationToken cancellationToken)
 {
-    var remote = client.Client.RemoteEndPoint?.ToString() ?? "?";
+    var remoteRaw = client.Client.RemoteEndPoint?.ToString() ?? "?";
+    var remote = EndpointFormatter.Normalize(remoteRaw);
     await ServerLogging.BroadcastAsync($"[connect] {remote}", cancellationToken).ConfigureAwait(false);
 
     try
