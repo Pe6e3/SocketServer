@@ -9,4 +9,7 @@
     <RootNamespace>SocketServer</RootNamespace>
     <AssemblyName>SocketServer</AssemblyName>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Npgsql" Version="9.0.3" />
+  </ItemGroup>
 </Project>

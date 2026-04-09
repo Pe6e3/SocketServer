@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Text.Json;
 
 namespace SocketServer;
 
@@ -40,6 +41,9 @@ internal static class SocketLoggerHttpServer
     <div class="panel">
       <div class="tools">
         <input id="filter" placeholder="Фильтр (substring)" />
+        <input id="from" type="datetime-local" />
+        <input id="to" type="datetime-local" />
+        <button id="apply">Применить</button>
         <button id="clear">Очистить</button>
       </div>
       <div id="log"></div>
@@ -50,6 +54,9 @@ internal static class SocketLoggerHttpServer
     const status = document.getElementById('status');
     const log = document.getElementById('log');
     const filter = document.getElementById('filter');
+    const from = document.getElementById('from');
+    const to = document.getElementById('to');
+    const apply = document.getElementById('apply');
     const clearBtn = document.getElementById('clear');
     const lines = [];
     let q = '';
@@ -82,19 +89,39 @@ internal static class SocketLoggerHttpServer
 
     filter.addEventListener('input', () => { q = filter.value.trim().toLowerCase(); render(); });
     clearBtn.addEventListener('click', () => { lines.length = 0; render(); });
+    apply.addEventListener('click', async () => { await loadHistory(true); });
+
+    async function loadHistory(replace) {
+      const qs = new URLSearchParams();
+      qs.set('limit', '100');
+      if (filter.value.trim().length) qs.set('q', filter.value.trim());
+      if (from.value) qs.set('from', new Date(from.value).toISOString());
+      if (to.value) qs.set('to', new Date(to.value).toISOString());
+      const res = await fetch(`./api/logs?${qs.toString()}`);
+      if (!res.ok) {
+        status.textContent = `history error: ${res.status}`;
+        return;
+      }
+      const data = await res.json();
+      const history = (data.lines || []).map(decodeEscapes);
+      if (replace)
+        lines.length = 0;
+      lines.push(...history);
+      if (lines.length > max) lines.splice(0, lines.length - max + 200);
+      render();
+    }
 
     const es = new EventSource('./logs');
-    es.onopen = () => { status.textContent = 'online'; };
+    es.onopen = async () => {
+      status.textContent = 'online';
+      await loadHistory(true);
+    };
     es.onmessage = (evt) => {
       const decoded = decodeEscapes(evt.data);
       lines.push(decoded);
       if (lines.length > max) lines.splice(0, lines.length - max + 200);
       if (!q || decoded.toLowerCase().includes(q)) {
-        const div = document.createElement('div');
-        div.className = 'line';
-        div.textContent = decoded;
-        log.appendChild(div);
-        log.scrollTop = log.scrollHeight;
+        render();
       }
     };
     es.onerror = () => { status.textContent = 'reconnecting...'; };
@@ -155,6 +182,12 @@ internal static class SocketLoggerHttpServer
             return;
         }
 
+        if (path == "/api/logs")
+        {
+            await ServeHistoryAsync(req, res, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
         res.StatusCode = 404;
         res.Close();
     }
@@ -183,5 +216,50 @@ internal static class SocketLoggerHttpServer
             await writer.WriteAsync("\n\n").ConfigureAwait(false);
             await writer.FlushAsync().ConfigureAwait(false);
         }
+    }
+
+    private static async Task ServeHistoryAsync(
+        HttpListenerRequest req,
+        HttpListenerResponse res,
+        CancellationToken cancellationToken)
+    {
+        if (!LogPersistence.Enabled)
+        {
+            res.StatusCode = 503;
+            res.ContentType = "application/json; charset=utf-8";
+            var unavailable = JsonSerializer.Serialize(new { message = "Log persistence is disabled." });
+            var unavailableBytes = Encoding.UTF8.GetBytes(unavailable);
+            await res.OutputStream.WriteAsync(unavailableBytes, cancellationToken).ConfigureAwait(false);
+            res.Close();
+            return;
+        }
+
+        var q = req.QueryString["q"];
+        var from = ParseDate(req.QueryString["from"]);
+        var to = ParseDate(req.QueryString["to"]);
+        var limit = ParseInt(req.QueryString["limit"], 100, 1, 1000);
+        var offset = ParseInt(req.QueryString["offset"], 0, 0, 1_000_000);
+
+        var lines = await LogPersistence.QueryLinesAsync(from, to, q, limit, offset, cancellationToken).ConfigureAwait(false);
+        res.StatusCode = 200;
+        res.ContentType = "application/json; charset=utf-8";
+        var payload = JsonSerializer.Serialize(new { lines });
+        var bytes = Encoding.UTF8.GetBytes(payload);
+        await res.OutputStream.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+        res.Close();
+    }
+
+    private static DateTimeOffset? ParseDate(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+        return DateTimeOffset.TryParse(value, out var dt) ? dt : null;
+    }
+
+    private static int ParseInt(string? value, int fallback, int min, int max)
+    {
+        if (!int.TryParse(value, out var n))
+            n = fallback;
+        return Math.Clamp(n, min, max);
     }
 }

@@ -4,6 +4,9 @@ using SocketServer;
 var port = int.TryParse(Environment.GetEnvironmentVariable("PORT"), out var p) ? p : 1984;
 var logPort = int.TryParse(Environment.GetEnvironmentVariable("LOG_PORT"), out var lp) ? lp : port + 1;
 var loggerHttpPort = int.TryParse(Environment.GetEnvironmentVariable("LOGGER_HTTP_PORT"), out var hp) ? hp : 5080;
+var postgresConnectionString =
+    Environment.GetEnvironmentVariable("POSTGRES_CONNECTION_STRING") ??
+    Environment.GetEnvironmentVariable("LOGS_POSTGRES_CONNECTION_STRING");
 
 using var shutdown = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) =>
@@ -11,6 +14,8 @@ Console.CancelKeyPress += (_, e) =>
     e.Cancel = true;
     shutdown.Cancel();
 };
+
+await LogPersistence.InitializeAsync(postgresConnectionString, shutdown.Token).ConfigureAwait(false);
 
 var dataListener = TcpListener.Create(port);
 var logListener = TcpListener.Create(logPort);
@@ -43,6 +48,7 @@ finally
 {
     dataListener.Stop();
     logListener.Stop();
+    await LogPersistence.ShutdownAsync().ConfigureAwait(false);
 }
 
 try

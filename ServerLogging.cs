@@ -6,8 +6,10 @@ internal static class ServerLogging
 {
     public static async Task BroadcastAsync(string message, CancellationToken cancellationToken = default)
     {
+        var now = DateTimeOffset.Now;
         await Console.Error.WriteLineAsync(message).ConfigureAwait(false);
-        var line = $"{DateTime.Now:dd.MM HH:mm:ss.fff}\t{message}";
+        var line = $"{now:dd.MM HH:mm:ss.fff}\t{message}";
+        LogPersistence.TryEnqueue(now, message);
         await LogHub.BroadcastLineAsync(line, cancellationToken).ConfigureAwait(false);
     }
 }
