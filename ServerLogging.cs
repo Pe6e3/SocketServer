@@ -7,7 +7,7 @@ internal static class ServerLogging
     public static async Task BroadcastAsync(string message, CancellationToken cancellationToken = default)
     {
         await Console.Error.WriteLineAsync(message).ConfigureAwait(false);
-        var line = $"{DateTime.UtcNow:O}\t{message}";
+        var line = $"{DateTime.Now:dd.MM HH:mm:ss.fff}\t{message}";
         await LogHub.BroadcastLineAsync(line, cancellationToken).ConfigureAwait(false);
     }
 }
