@@ -97,11 +97,11 @@ internal static class SocketLoggerHttpServer
     public static Task RunAsync(int httpPort, int logPort, CancellationToken cancellationToken)
     {
         var listener = new HttpListener();
-        listener.Prefixes.Add($"http://127.0.0.1:{httpPort}/");
+        listener.Prefixes.Add($"http://*:{httpPort}/");
         listener.Start();
         return Task.Run(async () =>
         {
-            await ServerLogging.BroadcastAsync($"[http] logger ui http://127.0.0.1:{httpPort}/", cancellationToken).ConfigureAwait(false);
+            await ServerLogging.BroadcastAsync($"[http] logger ui http://*:{httpPort}/", cancellationToken).ConfigureAwait(false);
             try
             {
                 while (!cancellationToken.IsCancellationRequested)

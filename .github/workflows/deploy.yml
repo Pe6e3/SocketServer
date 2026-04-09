@@ -25,11 +25,9 @@ jobs:
             git pull --ff-only origin main
 
             dotnet publish SocketServer.csproj -c Release -o /home/pe6e3/SocketServer/bin/Release/net8.0/publish
-            dotnet publish SocketConsoleClient/SocketConsoleClient.csproj -c Release -o /home/pe6e3/SocketServer/publish-client
 
             mkdir -p /home/pe6e3/.config/systemd/user
             cp -f /home/pe6e3/SocketServer/deploy/systemd-user/socketserver.service /home/pe6e3/.config/systemd/user/socketserver.service
-            cp -f /home/pe6e3/SocketServer/deploy/systemd-user/socket-console-client.service /home/pe6e3/.config/systemd/user/socket-console-client.service
 
             if ! systemctl --user daemon-reload; then
               echo "ERROR: systemd --user is unavailable. Enable linger once: sudo loginctl enable-linger pe6e3"
@@ -39,7 +37,3 @@ jobs:
             systemctl --user enable --now socketserver.service
             systemctl --user restart socketserver.service
             systemctl --user status socketserver.service --no-pager
-
-            systemctl --user enable --now socket-console-client.service
-            systemctl --user restart socket-console-client.service
-            systemctl --user status socket-console-client.service --no-pager
