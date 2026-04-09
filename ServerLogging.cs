@@ -34,7 +34,6 @@ internal static class DataPreview
     public static string Format(ReadOnlyMemory<byte> mem, int maxLen = 96)
     {
         var pool = new StringBuilder(Math.Min(mem.Length, maxLen) + 24);
-        pool.Append('|');
         var span = mem.Span;
         var n = Math.Min(span.Length, maxLen);
         for (var i = 0; i < n; i++)

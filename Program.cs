@@ -81,7 +81,7 @@ static async Task HandleDataClientAsync(TcpClient client, CancellationToken canc
             await stdout.WriteAsync(buffer.AsMemory(0, n), cancellationToken).ConfigureAwait(false);
             await stdout.FlushAsync(cancellationToken).ConfigureAwait(false);
             var preview = DataPreview.Format(buffer.AsMemory(0, n));
-            await ServerLogging.BroadcastAsync($"[rx] {remote} {n} B {preview}", cancellationToken).ConfigureAwait(false);
+            await ServerLogging.BroadcastAsync($"[rx] [{remote}] ({n}B) {preview}", cancellationToken).ConfigureAwait(false);
         }
     }
     catch (IOException ex)
